@@ -1,0 +1,2366 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Дашборд руководителя + Дебиторка</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        /* ---------- Базовые стили ---------- */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f4f8;
+            color: #1a2634;
+            padding: 16px;
+            min-height: 100vh;
+        }
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            color: #0b1e33;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header h1 small {
+            font-size: 14px;
+            font-weight: 400;
+            color: #6b7a8f;
+        }
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            background: #e9edf4;
+            color: #1a2634;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #d5dce8;
+        }
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #2563eb;
+            color: #2563eb;
+        }
+        .btn-outline:hover {
+            background: #2563eb;
+            color: #fff;
+        }
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .btn-group .btn-sm.active {
+            background: #2563eb;
+            color: #fff;
+            border-color: #2563eb;
+        }
+
+        /* ---------- Загрузка файлов ---------- */
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 1024px) {
+            .upload-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        @media (max-width: 768px) {
+            .upload-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .upload-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 20px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e9edf4;
+        }
+        .upload-card .label {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .upload-zone {
+            border: 2px dashed #d0d8e3;
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.2s;
+        }
+        .upload-zone:hover {
+            background: #f8faff;
+        }
+        .upload-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .file-status {
+            margin-top: 8px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: #f0f4ff;
+        }
+        .file-status .remove {
+            margin-left: auto;
+            color: #dc2626;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-weight: 600;
+        }
+        .hidden {
+            display: none !important;
+        }
+
+        /* ---------- Фильтры ---------- */
+        .filters-panel {
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e9edf4;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 20px;
+            align-items: center;
+        }
+        .filters-panel .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .filters-panel label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #4a5a6e;
+            white-space: nowrap;
+        }
+        .filters-panel select,
+        .filters-panel input {
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid #d0d8e3;
+            background: #f8faff;
+            font-size: 13px;
+            color: #1a2634;
+        }
+        .filters-panel select:focus,
+        .filters-panel input:focus {
+            outline: none;
+            border-color: #2563eb;
+        }
+        .filters-panel select[multiple] {
+            min-width: 120px;
+            max-height: 80px;
+        }
+        .filter-count {
+            font-size: 13px;
+            color: #6b7a8f;
+            margin-left: auto;
+        }
+
+        /* ---------- KPI ---------- */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .kpi-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e9edf4;
+            text-align: center;
+        }
+        .kpi-card .kpi-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7a8f;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .kpi-card .kpi-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 4px 0 2px;
+        }
+        .kpi-card .kpi-delta {
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .kpi-card .kpi-sub {
+            font-size: 11px;
+            color: #6b7a8f;
+        }
+        .kpi-green .kpi-value {
+            color: #16a34a;
+        }
+        .kpi-green .kpi-delta {
+            color: #16a34a;
+        }
+        .kpi-red .kpi-value {
+            color: #dc2626;
+        }
+        .kpi-red .kpi-delta {
+            color: #dc2626;
+        }
+        .kpi-yellow .kpi-value {
+            color: #eab308;
+        }
+        .kpi-yellow .kpi-delta {
+            color: #eab308;
+        }
+        .kpi-blue .kpi-value {
+            color: #2563eb;
+        }
+
+        /* ---------- Основная сетка ---------- */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px 18px 18px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            border: 1px solid #e9edf4;
+        }
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .card-title .badge {
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 10px;
+            border-radius: 20px;
+            background: #e9edf4;
+            color: #4a5a6e;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 240px;
+        }
+        .chart-wrapper.tall {
+            height: 280px;
+        }
+        .chart-controls {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        /* ---------- Таблицы ---------- */
+        .table-wrap {
+            overflow-x: auto;
+            max-height: 280px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+        .table-wrap table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table-wrap th {
+            background: #f0f4ff;
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 2px solid #dce2ec;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+        .table-wrap td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #edf1f7;
+            white-space: nowrap;
+        }
+        .table-wrap .num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .table-wrap .status-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #fef3c7;
+            color: #b45309;
+        }
+        .table-wrap .status-badge.lost {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .table-wrap .status-badge.active {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+        .table-wrap tbody tr:hover {
+            background: #f8faff;
+        }
+        .table-wrap .manager-group {
+            background: #f8faff;
+            font-weight: 700;
+        }
+        .table-wrap .manager-group td {
+            border-top: 2px solid #dce2ec;
+            padding-top: 10px;
+        }
+
+        /* ---------- Утилиты ---------- */
+        .empty-state {
+            text-align: center;
+            padding: 30px 20px;
+            color: #6b7a8f;
+        }
+        .empty-state .icon {
+            font-size: 36px;
+            margin-bottom: 8px;
+        }
+        .empty-state h3 {
+            font-size: 16px;
+            color: #1a2634;
+            margin-bottom: 4px;
+        }
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 380px;
+        }
+        .toast {
+            padding: 12px 18px;
+            border-radius: 10px;
+            background: #1a2634;
+            color: #fff;
+            font-size: 13px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.3s ease;
+        }
+        .toast.success {
+            background: #16a34a;
+        }
+        .toast.error {
+            background: #dc2626;
+        }
+        .toast.info {
+            background: #2563eb;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .mt-16 {
+            margin-top: 16px;
+        }
+        .two-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .kpi-card .kpi-value {
+                font-size: 18px;
+            }
+            .chart-wrapper {
+                height: 180px;
+            }
+            .filters-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filters-panel .filter-group {
+                flex-wrap: wrap;
+            }
+            .two-cols {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard" id="app">
+
+        <!-- Заголовок -->
+        <header class="header">
+            <h1>📊 Дашборд руководителя <small>продажи + дебиторка</small></h1>
+            <button class="btn btn-outline" id="resetBtn">⟳ Сбросить</button>
+        </header>
+
+        <!-- Загрузка файлов -->
+        <div class="upload-grid">
+            <div class="upload-card">
+                <div class="label">📈 Динамика продаж</div>
+                <div class="upload-zone" id="salesZone">
+                    <div>📂 Перетащите или нажмите</div>
+                    <div style="font-size:12px;color:#8a9bb0;">.xlsx, .xls</div>
+                    <input type="file" id="salesFileInput" accept=".xlsx,.xls" />
+                </div>
+                <div id="salesStatus" class="file-status hidden">
+                    <span>📄</span>
+                    <span class="badge" id="salesFileName">файл.xlsx</span>
+                    <span id="salesRowsInfo"></span>
+                    <button class="remove" data-target="sales">✕</button>
+                </div>
+            </div>
+            <div class="upload-card">
+                <div class="label">📋 План продаж</div>
+                <div class="upload-zone" id="planZone">
+                    <div>📂 Перетащите или нажмите</div>
+                    <div style="font-size:12px;color:#8a9bb0;">.xlsx, .xls</div>
+                    <input type="file" id="planFileInput" accept=".xlsx,.xls" />
+                </div>
+                <div id="planStatus" class="file-status hidden">
+                    <span>📄</span>
+                    <span class="badge" id="planFileName">файл.xlsx</span>
+                    <span id="planRowsInfo"></span>
+                    <button class="remove" data-target="plan">✕</button>
+                </div>
+            </div>
+            <div class="upload-card">
+                <div class="label">💳 Дебиторская задолженность</div>
+                <div class="upload-zone" id="debtZone">
+                    <div>📂 Перетащите или нажмите</div>
+                    <div style="font-size:12px;color:#8a9bb0;">.xlsx, .xls</div>
+                    <input type="file" id="debtFileInput" accept=".xlsx,.xls" />
+                </div>
+                <div id="debtStatus" class="file-status hidden">
+                    <span>📄</span>
+                    <span class="badge" id="debtFileName">файл.xlsx</span>
+                    <span id="debtRowsInfo"></span>
+                    <button class="remove" data-target="debt">✕</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Фильтры -->
+        <div class="filters-panel" id="filtersPanel">
+            <div class="filter-group">
+                <label for="filterYear">Год:</label>
+                <select id="filterYear"><option value="all">Все</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="filterMonth">Месяц:</label>
+                <select id="filterMonth"><option value="all">Все</option></select>
+            </div>
+            <div class="filter-group">
+                <label>Менеджер:</label>
+                <select id="filterManager" multiple size="2"><option value="all">Все</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="filterPriceType">Вид цен:</label>
+                <select id="filterPriceType"><option value="all">Все</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="filterClient">Клиент:</label>
+                <input type="text" id="filterClient" placeholder="Поиск..." style="min-width:120px;" />
+            </div>
+            <div class="filter-count" id="filterCount">Записей: 0</div>
+        </div>
+
+        <!-- KPI -->
+        <div class="kpi-grid" id="kpiGrid">
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-label">Выручка (авг 2026)</div>
+                <div class="kpi-value" id="kpiRevenue">—</div>
+                <div class="kpi-delta" id="kpiRevenueDelta">—</div>
+                <div class="kpi-sub">к прошлому месяцу</div>
+            </div>
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-label">Динамика к авг 2025</div>
+                <div class="kpi-value" id="kpiYoY">—</div>
+                <div class="kpi-delta" id="kpiYoYDelta">—</div>
+                <div class="kpi-sub">год к году</div>
+            </div>
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-label">Прирост клиентов</div>
+                <div class="kpi-value" id="kpiClientsGrowth">—</div>
+                <div class="kpi-delta" id="kpiClientsGrowthDelta">—</div>
+                <div class="kpi-sub">за месяц</div>
+            </div>
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-label">Выполнение плана</div>
+                <div class="kpi-value" id="kpiPlan">—</div>
+                <div class="kpi-delta" id="kpiPlanDelta">—</div>
+                <div class="kpi-sub">по выручке</div>
+            </div>
+            <div class="kpi-card kpi-blue">
+                <div class="kpi-label">Доля утраченных</div>
+                <div class="kpi-value" id="kpiLost">—</div>
+                <div class="kpi-delta" id="kpiLostDelta">—</div>
+                <div class="kpi-sub">клиентов за месяц</div>
+            </div>
+            <div class="kpi-card kpi-red">
+                <div class="kpi-label">Просроченная ДЗ</div>
+                <div class="kpi-value" id="kpiDebt">—</div>
+                <div class="kpi-delta" id="kpiDebtDelta">—</div>
+                <div class="kpi-sub">всего по менеджерам</div>
+            </div>
+        </div>
+
+        <!-- Основная сетка -->
+        <div class="main-grid">
+            <div>
+                <div class="card">
+                    <div class="card-title">
+                        <span>📈 Динамика выручки <span class="badge" id="trendPeriod">нет данных</span></span>
+                        <div class="chart-controls">
+                            <div class="btn-group" id="trendYearControls">
+                                <button class="btn btn-sm active" data-year="all">Все</button>
+                                <button class="btn btn-sm" data-year="2025">2025</button>
+                                <button class="btn btn-sm" data-year="2026">2026</button>
+                            </div>
+                            <div class="btn-group" id="trendPeriodControls">
+                                <button class="btn btn-sm active" data-period="month">Месяц</button>
+                                <button class="btn btn-sm" data-period="quarter">Квартал</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper"><canvas id="trendChart"></canvas></div>
+                </div>
+                <div class="card mt-16">
+                    <div class="card-title">
+                        <span>🧑‍💼 Динамика клиентов <span class="badge" id="clientTrendPeriod">нет данных</span></span>
+                        <div class="chart-controls">
+                            <div class="btn-group" id="clientModeControls">
+                                <button class="btn btn-sm active" data-mode="absolute">Абсолют</button>
+                                <button class="btn btn-sm" data-mode="growth">Прирост %</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper"><canvas id="clientTrendChart"></canvas></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <div class="card-title">
+                        <span>🏆 Топ-10 клиентов по менеджерам <span class="badge" id="topClientsPeriod">за год</span></span>
+                    </div>
+                    <div class="table-wrap" id="topClientsWrap">
+                        <div class="empty-state"><div class="icon">📋</div><h3>Нет данных</h3></div>
+                    </div>
+                </div>
+                <div class="card mt-16">
+                    <div class="card-title">
+                        <span>📊 Динамика менеджеров <span class="badge" id="managersTrendPeriod">нет данных</span></span>
+                        <div class="chart-controls">
+                            <div class="btn-group" id="managersTopControls">
+                                <button class="btn btn-sm active" data-top="3">Топ-3</button>
+                                <button class="btn btn-sm" data-top="5">Топ-5</button>
+                                <button class="btn btn-sm" data-top="10">Топ-10</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper"><canvas id="managersTrendChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Дебиторская задолженность -->
+        <div class="card mt-16">
+            <div class="card-title">
+                <span>💳 Дебиторская задолженность <span class="badge" id="debtPeriod">по менеджерам</span></span>
+            </div>
+            <div class="two-cols">
+                <div>
+                    <div class="chart-wrapper" style="height:260px;"><canvas id="debtBarChart"></canvas></div>
+                </div>
+                <div>
+                    <div class="chart-wrapper" style="height:260px;"><canvas id="debtPieChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Таблица дебиторки -->
+        <div class="card mt-16">
+            <div class="card-title">
+                <span>📋 Детализация просроченной задолженности <span class="badge" id="debtCount">0 записей</span></span>
+                <span style="font-weight:400;font-size:13px;color:#6b7a8f;display:flex;gap:8px;flex-wrap:wrap;">
+                    <select id="debtManagerFilter" style="padding:2px 8px;border-radius:4px;border:1px solid #d0d8e3;">
+                        <option value="all">Все менеджеры</option>
+                    </select>
+                </span>
+            </div>
+            <div class="table-wrap" id="debtTableWrap" style="max-height:400px;">
+                <div class="empty-state"><div class="icon">📂</div><h3>Нет данных по дебиторке</h3></div>
+            </div>
+        </div>
+
+        <!-- Утраченные клиенты -->
+        <div class="card mt-16">
+            <div class="card-title">
+                <span>⚠️ Утраченные клиенты <span class="badge" id="lostClientsCount">0</span></span>
+                <span style="font-weight:400;font-size:13px;color:#6b7a8f;display:flex;gap:8px;flex-wrap:wrap;">
+                    <select id="lostPeriodFilter" style="padding:2px 8px;border-radius:4px;border:1px solid #d0d8e3;">
+                        <option value="3">3+ месяца</option>
+                        <option value="6">6+ месяцев</option>
+                        <option value="12">12+ месяцев</option>
+                    </select>
+                    <select id="lostManagerFilter" style="padding:2px 8px;border-radius:4px;border:1px solid #d0d8e3;">
+                        <option value="all">Все менеджеры</option>
+                    </select>
+                </span>
+            </div>
+            <div class="table-wrap" id="lostClientsWrap" style="max-height:240px;">
+                <div class="empty-state"><div class="icon">📂</div><h3>Нет данных</h3></div>
+            </div>
+        </div>
+
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ---------- СОСТОЯНИЕ ----------
+            const state = {
+                salesData: null,
+                planData: null,
+                debtData: null,
+                filteredSales: null,
+                filters: {
+                    year: 'all',
+                    month: 'all',
+                    managers: ['all'],
+                    priceType: 'all',
+                    client: '',
+                    lostPeriod: 3,
+                    lostManager: 'all',
+                    debtManager: 'all'
+                },
+                chartControls: {
+                    trendYear: 'all',
+                    trendPeriod: 'month',
+                    clientMode: 'absolute',
+                    managersTop: 3,
+                    heatmapMode: 'percent'
+                },
+                charts: {
+                    trend: null,
+                    clientTrend: null,
+                    managersTrend: null,
+                    debtBar: null,
+                    debtPie: null
+                }
+            };
+
+            // ---------- DOM ----------
+            const $ = id => document.getElementById(id);
+            const salesInput = $('salesFileInput');
+            const planInput = $('planFileInput');
+            const debtInput = $('debtFileInput');
+            const salesZone = $('salesZone');
+            const planZone = $('planZone');
+            const debtZone = $('debtZone');
+            const salesStatus = $('salesStatus');
+            const planStatus = $('planStatus');
+            const debtStatus = $('debtStatus');
+            const salesFileName = $('salesFileName');
+            const planFileName = $('planFileName');
+            const debtFileName = $('debtFileName');
+            const salesRowsInfo = $('salesRowsInfo');
+            const planRowsInfo = $('planRowsInfo');
+            const debtRowsInfo = $('debtRowsInfo');
+            const filterYear = $('filterYear');
+            const filterMonth = $('filterMonth');
+            const filterManager = $('filterManager');
+            const filterPriceType = $('filterPriceType');
+            const filterClient = $('filterClient');
+            const filterCount = $('filterCount');
+            const resetBtn = $('resetBtn');
+            const lostPeriodFilter = $('lostPeriodFilter');
+            const lostManagerFilter = $('lostManagerFilter');
+            const debtManagerFilter = $('debtManagerFilter');
+            const debtTableWrap = $('debtTableWrap');
+            const debtCount = $('debtCount');
+
+            // ---------- TOAST ----------
+            function toast(message, type = 'info') {
+                const container = $('toastContainer');
+                const el = document.createElement('div');
+                el.className = `toast ${type}`;
+                el.textContent = message;
+                container.appendChild(el);
+                setTimeout(() => { el.remove(); }, 4000);
+            }
+
+            // ---------- UTILITY ----------
+            function formatCurrency(val) {
+                if (val === undefined || val === null || isNaN(val) || !isFinite(val)) return '—';
+                return Number(val).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            }
+
+            function formatCurrencyShort(val) {
+                if (val === undefined || val === null || isNaN(val) || !isFinite(val)) return '—';
+                if (Math.abs(val) >= 1e6) return (val / 1e6).toFixed(1) + 'M';
+                if (Math.abs(val) >= 1e3) return (val / 1e3).toFixed(1) + 'K';
+                return val.toFixed(0);
+            }
+
+            function sum(arr) {
+                return arr.reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
+            }
+
+            function unique(arr) {
+                return [...new Set(arr)];
+            }
+
+            function getMonthName(m) {
+                const names = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+                    'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'
+                ];
+                return names[m - 1] || m;
+            }
+
+            function getMonthNameShort(m) {
+                const names = ['янв', 'фев', 'мар', 'апр', 'май', 'июн',
+                    'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
+                ];
+                return names[m - 1] || m;
+            }
+
+            function parseDateFromString(str) {
+                if (!str) return null;
+                if (str instanceof Date) return str;
+                if (typeof str === 'number' && str > 30000 && str < 50000) {
+                    return new Date((str - 25569) * 86400 * 1000);
+                }
+                const s = String(str).trim();
+                let match;
+                match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (match) return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+                match = s.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})/);
+                if (match) return new Date(parseInt(match[3]), parseInt(match[2]) - 1, parseInt(match[1]));
+                return null;
+            }
+
+            function sortMonthKeys(keys) {
+                return keys.slice().sort((a, b) => {
+                    const da = parseDateFromString(a);
+                    const db = parseDateFromString(b);
+                    if (!da || !db) return a.localeCompare(b);
+                    return da.getTime() - db.getTime();
+                });
+            }
+
+            function getYearMonthFromKey(key) {
+                const d = parseDateFromString(key);
+                if (!d || isNaN(d.getTime())) return null;
+                return { year: d.getFullYear(), month: d.getMonth() + 1 };
+            }
+
+            function getDateFromKey(key) {
+                return parseDateFromString(key);
+            }
+
+            function getQuarter(month) {
+                return Math.ceil(month / 3);
+            }
+
+            function formatLabel(key) {
+                const ym = getYearMonthFromKey(key);
+                if (!ym) return key;
+                return getMonthName(ym.month) + ' ' + ym.year;
+            }
+
+            function formatShortLabel(key) {
+                const ym = getYearMonthFromKey(key);
+                if (!ym) return key;
+                return getMonthNameShort(ym.month) + "'" + String(ym.year).slice(2);
+            }
+
+            // ---------- ПАРСИНГ ----------
+            function parseSalesData(rows) {
+                if (!rows || rows.length < 2) return null;
+                const rawHeaders = rows[0];
+                const headers = rawHeaders.map(h => {
+                    if (h === undefined || h === null) return '';
+                    if (h instanceof Date) return h.toISOString().split('T')[0];
+                    if (typeof h === 'number') {
+                        const d = new Date((h - 25569) * 86400 * 1000);
+                        return d.toISOString().split('T')[0];
+                    }
+                    return String(h).trim();
+                });
+
+                const idxManager = headers.findIndex(h => /менеджер/i.test(h));
+                const idxPrice = headers.findIndex(h => /вид цен|цена/i.test(h));
+                const idxClient = headers.findIndex(h => /клиент/i.test(h));
+
+                const monthIndices = [];
+                const monthLabels = [];
+                headers.forEach((h, i) => {
+                    if (i === idxManager || i === idxPrice || i === idxClient) return;
+                    if (!h) return;
+                    const d = parseDateFromString(h);
+                    if (d && !isNaN(d.getTime())) {
+                        monthIndices.push(i);
+                        monthLabels.push(h);
+                    }
+                });
+
+                if (monthIndices.length === 0) {
+                    toast('Не найдены колонки с месяцами', 'error');
+                    return null;
+                }
+
+                const result = [];
+                for (let r = 1; r < rows.length; r++) {
+                    const row = rows[r];
+                    if (!row || row.every(c => c === undefined || c === null || c === '')) continue;
+                    const manager = (idxManager >= 0 && row[idxManager] !== undefined) ? String(row[idxManager] || '').trim() :
+                    '—';
+                    if (manager === 'Итого') continue;
+                    const priceType = (idxPrice >= 0 && row[idxPrice] !== undefined) ? String(row[idxPrice] || '').trim() : '—';
+                    const client = (idxClient >= 0 && row[idxClient] !== undefined) ? String(row[idxClient] || '').trim() : '—';
+
+                    const months = {};
+                    monthIndices.forEach((colIdx, i) => {
+                        const raw = row[colIdx];
+                        let num = 0;
+                        if (typeof raw === 'string') {
+                            const cleaned = raw.replace(/\s/g, '').replace(',', '.');
+                            num = parseFloat(cleaned);
+                        } else if (typeof raw === 'number') {
+                            num = raw;
+                        }
+                        if (isNaN(num)) num = 0;
+                        const key = monthLabels[i];
+                        months[key] = num;
+                    });
+                    result.push({ manager, priceType, client, months });
+                }
+                return result;
+            }
+
+            function parsePlanData(rows) {
+                if (!rows || rows.length < 2) return null;
+
+                const headers = rows[0].map(h => {
+                    if (h === undefined || h === null) return '';
+                    if (h instanceof Date) return h.toISOString().split('T')[0];
+                    if (typeof h === 'number') {
+                        const d = new Date((h - 25569) * 86400 * 1000);
+                        return d.toISOString().split('T')[0];
+                    }
+                    return String(h).trim();
+                });
+
+                const idxManager = headers.findIndex(h => /менеджер/i.test(h));
+
+                const monthIndices = [];
+                const monthLabels = [];
+                headers.forEach((h, i) => {
+                    if (i === idxManager) return;
+                    if (!h) return;
+                    const d = parseDateFromString(h);
+                    if (d && !isNaN(d.getTime())) {
+                        monthIndices.push(i);
+                        monthLabels.push(h);
+                    }
+                });
+
+                if (monthIndices.length === 0) {
+                    const idxPlan = headers.findIndex(h => /сумма план|план/i.test(h));
+                    const idxMonth = headers.findIndex(h => /месяц/i.test(h));
+                    if (idxPlan >= 0 && idxMonth >= 0) {
+                        const result = [];
+                        for (let r = 1; r < rows.length; r++) {
+                            const row = rows[r];
+                            if (!row || row.every(c => c === undefined || c === null || c === '')) continue;
+                            const manager = String(row[idxManager] || '').trim() || '—';
+                            if (manager === 'Итого') continue;
+                            let rawPlan = row[idxPlan];
+                            let plan = 0;
+                            if (typeof rawPlan === 'string') {
+                                const cleaned = rawPlan.replace(/\s/g, '').replace(',', '.');
+                                plan = parseFloat(cleaned);
+                            } else if (typeof rawPlan === 'number') {
+                                plan = rawPlan;
+                            }
+                            if (isNaN(plan)) plan = 0;
+                            const month = String(row[idxMonth] || '').trim();
+                            if (!month) continue;
+                            result.push({ manager, plan, month });
+                        }
+                        return result.length > 0 ? result : null;
+                    }
+                    toast('Не найдены колонки с месяцами или план/месяц', 'error');
+                    return null;
+                }
+
+                const result = [];
+                for (let r = 1; r < rows.length; r++) {
+                    const row = rows[r];
+                    if (!row || row.every(c => c === undefined || c === null || c === '')) continue;
+                    const manager = (idxManager >= 0 && row[idxManager] !== undefined) ? String(row[idxManager] || '').trim() :
+                    '—';
+                    if (manager === 'Итого') continue;
+
+                    monthIndices.forEach((colIdx, i) => {
+                        const raw = row[colIdx];
+                        let plan = 0;
+                        if (typeof raw === 'string') {
+                            const cleaned = raw.replace(/\s/g, '').replace(',', '.');
+                            plan = parseFloat(cleaned);
+                        } else if (typeof raw === 'number') {
+                            plan = raw;
+                        }
+                        if (isNaN(plan)) plan = 0;
+                        const monthKey = monthLabels[i];
+                        result.push({ manager, plan, month: monthKey });
+                    });
+                }
+
+                return result.length > 0 ? result : null;
+            }
+
+            // ---------- ПАРСИНГ ДЕБИТОРКИ ----------
+            function parseDebtData(rows) {
+                if (!rows || rows.length < 2) return null;
+
+                const headers = rows[0].map(h => {
+                    if (h === undefined || h === null) return '';
+                    return String(h).trim();
+                });
+
+                console.log('Заголовки дебиторки:', headers);
+
+                const idxContractor = headers.findIndex(h => /контрагент/i.test(h));
+                const idxObject = headers.findIndex(h => /объект/i.test(h));
+                const idxManager = headers.findIndex(h => /менеджер/i.test(h));
+                const idxDate = headers.findIndex(h => /погашения|дата/i.test(h));
+                const idxDays = headers.findIndex(h => /дней долга|дней/i.test(h));
+                const idxOverdue = headers.findIndex(h => /просрочка/i.test(h));
+                const idxOverdueSum = headers.findIndex(h => /просроченная сумма/i.test(h));
+
+                console.log('Индексы:', { idxContractor, idxObject, idxManager, idxDate, idxDays, idxOverdue, idxOverdueSum });
+
+                if (idxManager < 0 || idxOverdueSum < 0) {
+                    toast('Не найдены колонки "Менеджер" или "Просроченная сумма"', 'error');
+                    return null;
+                }
+
+                const result = [];
+                for (let r = 1; r < rows.length; r++) {
+                    const row = rows[r];
+                    if (!row || row.every(c => c === undefined || c === null || c === '')) continue;
+
+                    const contractor = (idxContractor >= 0 && row[idxContractor] !== undefined) ? String(row[idxContractor] ||
+                        '').trim() : '—';
+                    const object = (idxObject >= 0 && row[idxObject] !== undefined) ? String(row[idxObject] || '').trim() : '—';
+                    const manager = (idxManager >= 0 && row[idxManager] !== undefined) ? String(row[idxManager] || '').trim() :
+                    '—';
+                    if (!manager || manager === 'Итого') continue;
+
+                    const date = (idxDate >= 0 && row[idxDate] !== undefined) ? String(row[idxDate] || '').trim() : '—';
+                    let days = 0;
+                    if (idxDays >= 0) {
+                        const raw = row[idxDays];
+                        if (typeof raw === 'string') {
+                            days = parseInt(raw.replace(/\s/g, '')) || 0;
+                        } else if (typeof raw === 'number') {
+                            days = raw;
+                        }
+                    }
+
+                    let overdueSum = 0;
+                    const rawSum = row[idxOverdueSum];
+                    if (typeof rawSum === 'string') {
+                        const cleaned = rawSum.replace(/\s/g, '').replace(',', '.');
+                        overdueSum = parseFloat(cleaned) || 0;
+                    } else if (typeof rawSum === 'number') {
+                        overdueSum = rawSum;
+                    }
+
+                    if (overdueSum === 0) continue;
+
+                    result.push({
+                        contractor,
+                        object,
+                        manager,
+                        date,
+                        days: Math.round(days),
+                        overdueSum: overdueSum
+                    });
+                }
+
+                console.log('Распарсено записей дебиторки:', result.length);
+                return result;
+            }
+
+            // ---------- ФИЛЬТРАЦИЯ ----------
+            function filterSalesData(data, filters) {
+                if (!data) return null;
+
+                const selectedManagers = filters.managers || ['all'];
+                const isAllManagers = selectedManagers.includes('all');
+
+                let filtered = data.filter(item => {
+                    if (!isAllManagers && !selectedManagers.includes(item.manager)) return false;
+                    if (filters.priceType !== 'all' && item.priceType !== filters.priceType) return false;
+                    if (filters.client) {
+                        const search = filters.client.toLowerCase().trim();
+                        if (!item.client.toLowerCase().includes(search)) return false;
+                    }
+                    return true;
+                });
+
+                const year = filters.year !== 'all' ? parseInt(filters.year) : null;
+                const month = filters.month !== 'all' ? parseInt(filters.month) : null;
+
+                if (year !== null || month !== null) {
+                    filtered = filtered.map(item => {
+                        const newMonths = {};
+                        Object.keys(item.months).forEach(key => {
+                            const ym = getYearMonthFromKey(key);
+                            if (!ym) return;
+                            if (year !== null && ym.year !== year) return;
+                            if (month !== null && ym.month !== month) return;
+                            newMonths[key] = item.months[key];
+                        });
+                        return { ...item, months: newMonths };
+                    }).filter(item => Object.keys(item.months).length > 0);
+                }
+
+                return filtered;
+            }
+
+            // ---------- ПОПУЛЯЦИЯ ФИЛЬТРОВ ----------
+            function populateFilters(data) {
+                if (!data || data.length === 0) {
+                    [filterYear, filterMonth, filterPriceType].forEach(sel => {
+                        sel.innerHTML = '<option value="all">Все</option>';
+                    });
+                    filterManager.innerHTML = '<option value="all">Все</option>';
+                    lostManagerFilter.innerHTML = '<option value="all">Все менеджеры</option>';
+                    debtManagerFilter.innerHTML = '<option value="all">Все менеджеры</option>';
+                    return;
+                }
+
+                const yearsSet = new Set();
+                const monthsSet = new Set();
+                data.forEach(item => {
+                    Object.keys(item.months).forEach(key => {
+                        const ym = getYearMonthFromKey(key);
+                        if (ym) {
+                            yearsSet.add(ym.year);
+                            monthsSet.add(ym.month);
+                        }
+                    });
+                });
+                const managers = unique(data.map(item => item.manager)).sort();
+                const priceTypes = unique(data.map(item => item.priceType)).sort();
+
+                const yearOptions = ['<option value="all">Все</option>'];
+                [...yearsSet].sort().forEach(y => yearOptions.push(`<option value="${y}">${y}</option>`));
+                filterYear.innerHTML = yearOptions.join('');
+
+                const monthOptions = ['<option value="all">Все</option>'];
+                [...monthsSet].sort((a, b) => a - b).forEach(m => {
+                    monthOptions.push(`<option value="${m}">${getMonthName(m)}</option>`);
+                });
+                filterMonth.innerHTML = monthOptions.join('');
+
+                let mgrOptions = '';
+                managers.forEach(m => {
+                    mgrOptions += `<option value="${m}">${m}</option>`;
+                });
+                filterManager.innerHTML = mgrOptions;
+                const allOpt = document.createElement('option');
+                allOpt.value = 'all';
+                allOpt.textContent = 'Все';
+                filterManager.prepend(allOpt);
+                filterManager.value = 'all';
+
+                const priceOptions = ['<option value="all">Все</option>'];
+                priceTypes.forEach(p => priceOptions.push(`<option value="${p}">${p}</option>`));
+                filterPriceType.innerHTML = priceOptions.join('');
+
+                let lostOpts = '<option value="all">Все менеджеры</option>';
+                managers.forEach(m => { lostOpts += `<option value="${m}">${m}</option>`; });
+                lostManagerFilter.innerHTML = lostOpts;
+
+                let debtOpts = '<option value="all">Все менеджеры</option>';
+                managers.forEach(m => { debtOpts += `<option value="${m}">${m}</option>`; });
+                debtManagerFilter.innerHTML = debtOpts;
+
+                filterYear.value = state.filters.year;
+                filterMonth.value = state.filters.month;
+                filterPriceType.value = state.filters.priceType;
+                if (state.filters.managers && state.filters.managers.length > 0) {
+                    filterManager.value = state.filters.managers.includes('all') ? 'all' : state.filters.managers[0];
+                }
+            }
+
+            // ---------- KPI ----------
+            function updateKPI(salesData, planData, debtData) {
+                const currentDate = new Date(2026, 7, 1);
+                const currentYear = 2026;
+                const currentMonth = 8;
+
+                function getFilteredMonthSum(data, year, month, filters) {
+                    if (!data) return 0;
+                    const filtered = filterSalesData(data, filters);
+                    if (!filtered) return 0;
+                    let total = 0;
+                    filtered.forEach(item => {
+                        Object.keys(item.months).forEach(key => {
+                            const ym = getYearMonthFromKey(key);
+                            if (ym && ym.year === year && ym.month === month) {
+                                total += item.months[key] || 0;
+                            }
+                        });
+                    });
+                    return total;
+                }
+
+                const currentRevenue = getFilteredMonthSum(salesData, currentYear, currentMonth, state.filters);
+
+                const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+                const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+                const prevRevenue = getFilteredMonthSum(salesData, prevYear, prevMonth, state.filters);
+
+                const lastYearRevenue = getFilteredMonthSum(salesData, currentYear - 1, currentMonth, state.filters);
+
+                const deltaMonth = prevRevenue > 0 ? ((currentRevenue - prevRevenue) / prevRevenue * 100) : 0;
+                const deltaMonthAbs = currentRevenue - prevRevenue;
+                const deltaYear = lastYearRevenue > 0 ? ((currentRevenue - lastYearRevenue) / lastYearRevenue * 100) : 0;
+                const deltaYearAbs = currentRevenue - lastYearRevenue;
+
+                function getUniqueClients(data) {
+                    if (!data) return new Set();
+                    const clients = new Set();
+                    data.forEach(item => clients.add(item.client));
+                    return clients;
+                }
+
+                const currentData = filterSalesData(salesData, { ...state.filters, year: currentYear, month: currentMonth });
+                const currentClients = getUniqueClients(currentData);
+                const prevData = filterSalesData(salesData, { ...state.filters, year: prevYear, month: prevMonth });
+                const prevClients = getUniqueClients(prevData);
+
+                const newClients = new Set([...currentClients].filter(c => !prevClients.has(c)));
+                const lostClients = new Set([...prevClients].filter(c => !currentClients.has(c)));
+                const growthClients = newClients.size - lostClients.size;
+
+                let planRevenue = 0;
+                if (planData) {
+                    planData.forEach(p => {
+                        const ym = getYearMonthFromKey(p.month);
+                        if (ym && ym.year === currentYear && ym.month === currentMonth) {
+                            if (state.filters.managers.includes('all') || state.filters.managers.includes(p.manager)) {
+                                planRevenue += p.plan || 0;
+                            }
+                        }
+                    });
+                }
+                const planAchievement = planRevenue > 0 ? (currentRevenue / planRevenue * 100) : 0;
+                const totalPrevClients = prevClients.size;
+                const lostRatio = totalPrevClients > 0 ? (lostClients.size / totalPrevClients * 100) : 0;
+
+                // Дебиторка
+                let totalDebt = 0;
+                if (debtData) {
+                    totalDebt = debtData.reduce((sum, item) => sum + item.overdueSum, 0);
+                }
+
+                const kpiRevenue = $('kpiRevenue');
+                const kpiRevenueDelta = $('kpiRevenueDelta');
+                const kpiYoY = $('kpiYoY');
+                const kpiYoYDelta = $('kpiYoYDelta');
+                const kpiClientsGrowth = $('kpiClientsGrowth');
+                const kpiClientsGrowthDelta = $('kpiClientsGrowthDelta');
+                const kpiPlan = $('kpiPlan');
+                const kpiPlanDelta = $('kpiPlanDelta');
+                const kpiLost = $('kpiLost');
+                const kpiLostDelta = $('kpiLostDelta');
+                const kpiDebt = $('kpiDebt');
+                const kpiDebtDelta = $('kpiDebtDelta');
+
+                function getColorClass(value, isPercent = true) {
+                    if (isPercent) {
+                        if (value > 5) return 'kpi-green';
+                        if (value < -5) return 'kpi-red';
+                        return 'kpi-yellow';
+                    }
+                    return 'kpi-blue';
+                }
+
+                kpiRevenue.textContent = formatCurrency(currentRevenue);
+                kpiRevenue.parentElement.className = 'kpi-card ' + getColorClass(deltaMonth);
+
+                const deltaMonthStr = (deltaMonth >= 0 ? '+' : '') + deltaMonth.toFixed(1) + '%';
+                const deltaMonthAbsStr = (deltaMonthAbs >= 0 ? '+' : '') + formatCurrency(deltaMonthAbs);
+                kpiRevenueDelta.textContent = `${deltaMonthStr} (${deltaMonthAbsStr} руб.)`;
+                kpiRevenueDelta.style.color = deltaMonth >= 0 ? '#16a34a' : '#dc2626';
+
+                const deltaYearStr = (deltaYear >= 0 ? '+' : '') + deltaYear.toFixed(1) + '%';
+                const deltaYearAbsStr = (deltaYearAbs >= 0 ? '+' : '') + formatCurrency(deltaYearAbs);
+                kpiYoY.textContent = deltaYearStr;
+                kpiYoYDelta.textContent = `${deltaYearAbsStr} руб.`;
+                kpiYoY.parentElement.className = 'kpi-card ' + getColorClass(deltaYear);
+                kpiYoY.style.color = deltaYear >= 0 ? '#16a34a' : '#dc2626';
+
+                kpiClientsGrowth.textContent = (growthClients >= 0 ? '+' : '') + growthClients;
+                kpiClientsGrowthDelta.textContent = `новых: ${newClients.size}, утрачено: ${lostClients.size}`;
+                kpiClientsGrowth.parentElement.className = 'kpi-card ' + getColorClass(growthClients, false);
+                kpiClientsGrowth.style.color = growthClients >= 0 ? '#16a34a' : '#dc2626';
+
+                kpiPlan.textContent = planAchievement.toFixed(1) + '%';
+                kpiPlanDelta.textContent = `план: ${formatCurrency(planRevenue)} руб.`;
+                kpiPlan.parentElement.className = 'kpi-card ' + (planAchievement >= 95 ? 'kpi-green' : planAchievement >= 80 ?
+                    'kpi-yellow' : 'kpi-red');
+
+                kpiLost.textContent = lostRatio.toFixed(1) + '%';
+                kpiLostDelta.textContent = `${lostClients.size} клиентов`;
+                kpiLost.parentElement.className = 'kpi-card ' + (lostRatio <= 10 ? 'kpi-green' : lostRatio <= 20 ?
+                    'kpi-yellow' : 'kpi-red');
+                kpiLost.style.color = lostRatio <= 10 ? '#16a34a' : lostRatio <= 20 ? '#eab308' : '#dc2626';
+
+                kpiDebt.textContent = formatCurrency(totalDebt);
+                kpiDebt.parentElement.className = 'kpi-card kpi-red';
+                kpiDebtDelta.textContent = debtData ? `${debtData.length} записей` : 'нет данных';
+            }
+
+            // ---------- ГРАФИКИ (сокращённые, полная версия была в предыдущих ответах) ----------
+            function renderTrendChart(salesData) {
+                const ctx = document.getElementById('trendChart').getContext('2d');
+                if (state.charts.trend) { state.charts.trend.destroy();
+                    state.charts.trend = null; }
+
+                if (!salesData || salesData.length === 0) {
+                    $('trendPeriod').textContent = 'нет данных';
+                    state.charts.trend = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                    return;
+                }
+
+                const allMonths = new Set();
+                salesData.forEach(item => {
+                    Object.keys(item.months).forEach(k => allMonths.add(k));
+                });
+                let monthKeys = sortMonthKeys([...allMonths]);
+
+                const trendYear = state.chartControls.trendYear;
+                const trendPeriod = state.chartControls.trendPeriod;
+
+                if (trendYear !== 'all') {
+                    monthKeys = monthKeys.filter(k => {
+                        const ym = getYearMonthFromKey(k);
+                        return ym && ym.year === parseInt(trendYear);
+                    });
+                }
+
+                let labels, data2025, data2026;
+                if (trendPeriod === 'quarter') {
+                    const quarterlyData = {};
+                    monthKeys.forEach(key => {
+                        const ym = getYearMonthFromKey(key);
+                        if (!ym) return;
+                        const q = getQuarter(ym.month);
+                        const qKey = `${ym.year}-Q${q}`;
+                        if (!quarterlyData[qKey]) quarterlyData[qKey] = { year: ym.year, quarter: q, total: 0 };
+                        let total = 0;
+                        salesData.forEach(item => {
+                            total += item.months[key] || 0;
+                        });
+                        quarterlyData[qKey].total += total;
+                    });
+                    const qKeys = Object.keys(quarterlyData).sort();
+                    labels = qKeys.map(k => {
+                        const parts = k.split('-Q');
+                        return `Q${parts[1]} ${parts[0]}`;
+                    });
+                    data2025 = qKeys.map(k => quarterlyData[k].year === 2025 ? quarterlyData[k].total : 0);
+                    data2026 = qKeys.map(k => quarterlyData[k].year === 2026 ? quarterlyData[k].total : 0);
+                } else {
+                    labels = monthKeys.map(k => formatLabel(k));
+                    data2025 = monthKeys.map(k => {
+                        let total = 0;
+                        salesData.forEach(item => { total += item.months[k] || 0; });
+                        const ym = getYearMonthFromKey(k);
+                        return ym && ym.year === 2025 ? total : 0;
+                    });
+                    data2026 = monthKeys.map(k => {
+                        let total = 0;
+                        salesData.forEach(item => { total += item.months[k] || 0; });
+                        const ym = getYearMonthFromKey(k);
+                        return ym && ym.year === 2026 ? total : 0;
+                    });
+                }
+
+                if (labels.length > 0) {
+                    $('trendPeriod').textContent = `${labels.length} периодов`;
+                    state.charts.trend = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: '2025',
+                                data: data2025,
+                                backgroundColor: 'rgba(156,163,175,0.5)',
+                                borderColor: '#9ca3af',
+                                borderWidth: 1,
+                                borderRadius: 2,
+                                order: 2,
+                                barPercentage: 0.35,
+                            }, {
+                                label: '2026 (факт)',
+                                data: data2026,
+                                backgroundColor: 'rgba(37,99,235,0.7)',
+                                borderColor: '#2563eb',
+                                borderWidth: 2,
+                                borderRadius: 3,
+                                order: 1,
+                                barPercentage: 0.35,
+                            }, {
+                                label: '2025 (линия)',
+                                data: data2025,
+                                type: 'line',
+                                borderColor: '#9ca3af',
+                                borderWidth: 2,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#9ca3af',
+                                fill: false,
+                                tension: 0.3,
+                                order: 0,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(ctx) {
+                                            if (ctx.dataset.label === '2025' && ctx.dataset.type === 'line') return '2025: ' +
+                                                formatCurrency(ctx.parsed.y);
+                                            return ctx.dataset.label + ': ' + formatCurrency(ctx.parsed.y);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { callback: val => formatCurrencyShort(val) }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $('trendPeriod').textContent = 'нет данных';
+                    state.charts.trend = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                }
+            }
+
+            function renderClientChart(salesData) {
+                const ctx = document.getElementById('clientTrendChart').getContext('2d');
+                if (state.charts.clientTrend) { state.charts.clientTrend.destroy();
+                    state.charts.clientTrend = null; }
+
+                if (!salesData || salesData.length === 0) {
+                    $('clientTrendPeriod').textContent = 'нет данных';
+                    state.charts.clientTrend = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                    return;
+                }
+
+                const monthClients = {};
+                salesData.forEach(item => {
+                    Object.keys(item.months).forEach(key => {
+                        const val = item.months[key] || 0;
+                        if (val > 0) {
+                            if (!monthClients[key]) monthClients[key] = new Set();
+                            monthClients[key].add(item.client);
+                        }
+                    });
+                });
+
+                const monthKeys = sortMonthKeys(Object.keys(monthClients));
+                const totalClients = monthKeys.map(k => monthClients[k].size);
+
+                const mode = state.chartControls.clientMode;
+                let labels, datasets;
+
+                if (mode === 'growth') {
+                    const growthData = [];
+                    let prevTotal = totalClients[0] || 0;
+                    for (let i = 0; i < totalClients.length; i++) {
+                        if (i === 0) {
+                            growthData.push(0);
+                        } else {
+                            const growth = prevTotal > 0 ? ((totalClients[i] - prevTotal) / prevTotal * 100) : 0;
+                            growthData.push(growth);
+                        }
+                        prevTotal = totalClients[i];
+                    }
+                    labels = monthKeys.map(k => formatShortLabel(k));
+                    datasets = [{
+                        label: 'Прирост клиентов %',
+                        data: growthData,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37,99,235,0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#2563eb',
+                        pointRadius: 3,
+                        borderWidth: 2,
+                    }];
+                } else {
+                    const newClients = [];
+                    const lostClients = [];
+                    let prevSet = new Set();
+                    monthKeys.forEach((k, idx) => {
+                        const currentSet = monthClients[k] || new Set();
+                        if (idx === 0) {
+                            newClients.push(currentSet.size);
+                            lostClients.push(0);
+                        } else {
+                            const newCount = [...currentSet].filter(c => !prevSet.has(c)).length;
+                            const lostCount = [...prevSet].filter(c => !currentSet.has(c)).length;
+                            newClients.push(newCount);
+                            lostClients.push(lostCount);
+                        }
+                        prevSet = currentSet;
+                    });
+                    labels = monthKeys.map(k => formatShortLabel(k));
+                    datasets = [{
+                        label: 'Всего клиентов',
+                        data: totalClients,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37,99,235,0.08)',
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#2563eb',
+                        pointRadius: 3,
+                        borderWidth: 2,
+                        yAxisID: 'y',
+                    }, {
+                        label: 'Новые клиенты',
+                        data: newClients,
+                        borderColor: '#16a34a',
+                        backgroundColor: 'rgba(22,163,74,0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#16a34a',
+                        pointRadius: 3,
+                        borderWidth: 2,
+                        yAxisID: 'y1',
+                    }, {
+                        label: 'Утраченные клиенты',
+                        data: lostClients,
+                        borderColor: '#dc2626',
+                        backgroundColor: 'rgba(220,38,38,0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#dc2626',
+                        pointRadius: 3,
+                        borderWidth: 2,
+                        yAxisID: 'y1',
+                    }];
+                }
+
+                if (labels.length > 0) {
+                    $('clientTrendPeriod').textContent = `${labels.length} мес.`;
+                    state.charts.clientTrend = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: labels, datasets: datasets },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(ctx) {
+                                            if (mode === 'growth') return ctx.dataset.label + ': ' + ctx.parsed.y
+                                                .toFixed(1) + '%';
+                                            return ctx.dataset.label + ': ' + ctx.parsed.y;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: mode === 'growth' ? { beginAtZero: true } : { beginAtZero: true, position: 'left',
+                                    ticks: { stepSize: 1 } },
+                                y1: mode === 'growth' ? null : { beginAtZero: true, position: 'right',
+                                    grid: { drawOnChartArea: false }, ticks: { stepSize: 1 } }
+                            }
+                        }
+                    });
+                } else {
+                    $('clientTrendPeriod').textContent = 'нет данных';
+                    state.charts.clientTrend = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                }
+            }
+
+            function renderManagersChart(salesData) {
+                const ctx = document.getElementById('managersTrendChart').getContext('2d');
+                if (state.charts.managersTrend) { state.charts.managersTrend.destroy();
+                    state.charts.managersTrend = null; }
+
+                if (!salesData || salesData.length === 0) {
+                    $('managersTrendPeriod').textContent = 'нет данных';
+                    state.charts.managersTrend = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                    return;
+                }
+
+                const managerData = {};
+                salesData.forEach(item => {
+                    if (!managerData[item.manager]) managerData[item.manager] = {};
+                    Object.keys(item.months).forEach(key => {
+                        if (!managerData[item.manager][key]) managerData[item.manager][key] = 0;
+                        managerData[item.manager][key] += item.months[key] || 0;
+                    });
+                });
+
+                const managerTotals = {};
+                Object.keys(managerData).forEach(mgr => {
+                    managerTotals[mgr] = sum(Object.values(managerData[mgr]));
+                });
+                const topN = state.chartControls.managersTop || 3;
+                const topManagers = Object.keys(managerTotals).sort((a, b) => managerTotals[b] - managerTotals[a]).slice(0, topN);
+
+                const allMonths = new Set();
+                topManagers.forEach(mgr => {
+                    Object.keys(managerData[mgr]).forEach(k => allMonths.add(k));
+                });
+                const monthKeys = sortMonthKeys([...allMonths]);
+
+                if (topManagers.length > 0 && monthKeys.length > 0) {
+                    $('managersTrendPeriod').textContent = `${topManagers.length} менеджеров`;
+                    const colors = ['#2563eb', '#7c3aed', '#dc2626', '#16a34a', '#eab308', '#f97316', '#8b5cf6', '#ec4899',
+                        '#14b8a6', '#f59e0b'
+                    ];
+                    const datasets = topManagers.map((mgr, idx) => {
+                        const data = monthKeys.map(k => managerData[mgr][k] || 0);
+                        return {
+                            label: mgr,
+                            data: data,
+                            borderColor: colors[idx % colors.length],
+                            backgroundColor: colors[idx % colors.length] + '20',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 3,
+                            borderWidth: 2,
+                        };
+                    });
+
+                    state.charts.managersTrend = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: monthKeys.map(k => formatShortLabel(k)),
+                            datasets: datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { size: 10 } } },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(ctx) {
+                                            return ctx.dataset.label + ': ' + formatCurrency(ctx.parsed.y);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { callback: val => formatCurrencyShort(val) }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $('managersTrendPeriod').textContent = 'нет данных';
+                    state.charts.managersTrend = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                }
+            }
+
+            function renderTopClients(salesData) {
+                const wrap = $('topClientsWrap');
+                if (!salesData || salesData.length === 0) {
+                    wrap.innerHTML = `<div class="empty-state"><div class="icon">📋</div><h3>Нет данных</h3></div>`;
+                    $('topClientsPeriod').textContent = 'за год';
+                    return;
+                }
+
+                const managerClientData = {};
+                const year = state.filters.year !== 'all' ? parseInt(state.filters.year) : null;
+
+                salesData.forEach(item => {
+                    const mgr = item.manager;
+                    const client = item.client;
+                    const key = `${mgr}|${client}`;
+                    if (!managerClientData[key]) {
+                        managerClientData[key] = { manager: mgr, client: client, total: 0 };
+                    }
+                    let total = 0;
+                    Object.keys(item.months).forEach(monthKey => {
+                        const ym = getYearMonthFromKey(monthKey);
+                        if (year !== null && ym && ym.year !== year) return;
+                        total += item.months[monthKey] || 0;
+                    });
+                    managerClientData[key].total += total;
+                });
+
+                const managers = {};
+                Object.values(managerClientData).forEach(item => {
+                    if (item.total === 0) return;
+                    if (!managers[item.manager]) managers[item.manager] = [];
+                    managers[item.manager].push({ client: item.client, total: item.total });
+                });
+
+                let html = `<table><thead><tr><th>Менеджер</th><th>Клиент</th><th>Сумма за год</th><th>Доля в выручке</th></tr></thead><tbody>`;
+                let hasData = false;
+
+                Object.keys(managers).forEach(mgr => {
+                    const clients = managers[mgr].sort((a, b) => b.total - a.total).slice(0, 10);
+                    const totalMgr = sum(clients.map(c => c.total));
+                    clients.forEach(c => {
+                        const pct = totalMgr > 0 ? (c.total / totalMgr * 100).toFixed(1) : 0;
+                        html += `<tr>
+                            <td><strong>${mgr}</strong></td>
+                            <td>${c.client}</td>
+                            <td class="num">${formatCurrency(c.total)}</td>
+                            <td class="num">${pct}%</td>
+                        </tr>`;
+                        hasData = true;
+                    });
+                });
+
+                html += `</tbody></table>`;
+                if (!hasData) {
+                    wrap.innerHTML = `<div class="empty-state"><div class="icon">📋</div><h3>Нет данных за выбранный период</h3></div>`;
+                } else {
+                    wrap.innerHTML = html;
+                }
+                $('topClientsPeriod').textContent = year ? `за ${year} год` : 'за год';
+            }
+
+            // ---------- ГРАФИКИ ДЕБИТОРКИ ----------
+            function renderDebtCharts(debtData) {
+                const barCtx = document.getElementById('debtBarChart').getContext('2d');
+                const pieCtx = document.getElementById('debtPieChart').getContext('2d');
+
+                if (state.charts.debtBar) { state.charts.debtBar.destroy();
+                    state.charts.debtBar = null; }
+                if (state.charts.debtPie) { state.charts.debtPie.destroy();
+                    state.charts.debtPie = null; }
+
+                if (!debtData || debtData.length === 0) {
+                    $('debtPeriod').textContent = 'нет данных';
+                    state.charts.debtBar = new Chart(barCtx, {
+                        type: 'bar',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                    state.charts.debtPie = new Chart(pieCtx, {
+                        type: 'pie',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                    return;
+                }
+
+                // Группируем по менеджеру
+                const managerDebt = {};
+                debtData.forEach(item => {
+                    if (!managerDebt[item.manager]) managerDebt[item.manager] = 0;
+                    managerDebt[item.manager] += item.overdueSum;
+                });
+
+                const managers = Object.keys(managerDebt).sort((a, b) => managerDebt[b] - managerDebt[a]);
+                const values = managers.map(m => managerDebt[m]);
+
+                // Цвета для диаграмм
+                const colors = ['#2563eb', '#7c3aed', '#dc2626', '#16a34a', '#eab308', '#f97316', '#8b5cf6', '#ec4899', '#14b8a6',
+                    '#f59e0b', '#6366f1', '#ef4444'
+                ];
+
+                // Столбчатая диаграмма
+                if (managers.length > 0) {
+                    $('debtPeriod').textContent = `${managers.length} менеджеров`;
+                    state.charts.debtBar = new Chart(barCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: managers,
+                            datasets: [{
+                                label: 'Просроченная сумма',
+                                data: values,
+                                backgroundColor: managers.map((_, i) => colors[i % colors.length] + 'CC'),
+                                borderColor: managers.map((_, i) => colors[i % colors.length]),
+                                borderWidth: 2,
+                                borderRadius: 4,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(ctx) {
+                                            return 'Просрочено: ' + formatCurrency(ctx.parsed.y);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { callback: val => formatCurrencyShort(val) }
+                                }
+                            }
+                        }
+                    });
+
+                    // Круговая диаграмма (доля)
+                    state.charts.debtPie = new Chart(pieCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: managers,
+                            datasets: [{
+                                data: values,
+                                backgroundColor: managers.map((_, i) => colors[i % colors.length] + 'CC'),
+                                borderColor: '#fff',
+                                borderWidth: 2,
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'right',
+                                    labels: { boxWidth: 12, padding: 8, font: { size: 11 } }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(ctx) {
+                                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                            const pct = total > 0 ? (ctx.parsed / total * 100).toFixed(1) : 0;
+                                            return ctx.label + ': ' + formatCurrency(ctx.parsed) + ' (' + pct + '%)';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    $('debtPeriod').textContent = 'нет данных';
+                    state.charts.debtBar = new Chart(barCtx, {
+                        type: 'bar',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                    state.charts.debtPie = new Chart(pieCtx, {
+                        type: 'pie',
+                        data: { labels: [], datasets: [] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                    });
+                }
+            }
+
+            // ---------- ТАБЛИЦА ДЕБИТОРКИ ----------
+            function renderDebtTable(debtData) {
+                const selectedManager = debtManagerFilter.value;
+
+                let filtered = debtData || [];
+                if (selectedManager !== 'all') {
+                    filtered = filtered.filter(item => item.manager === selectedManager);
+                }
+
+                // Сортируем по убыванию суммы и дней
+                filtered = filtered.sort((a, b) => {
+                    if (b.overdueSum !== a.overdueSum) return b.overdueSum - a.overdueSum;
+                    return b.days - a.days;
+                });
+
+                debtCount.textContent = `${filtered.length} записей`;
+
+                if (filtered.length === 0) {
+                    debtTableWrap.innerHTML = `<div class="empty-state"><div class="icon">📋</div><h3>Нет данных по дебиторке</h3></div>`;
+                    return;
+                }
+
+                // Группируем по менеджеру
+                const grouped = {};
+                filtered.forEach(item => {
+                    if (!grouped[item.manager]) grouped[item.manager] = [];
+                    grouped[item.manager].push(item);
+                });
+
+                let html = `<table><thead><tr>
+                    <th>Менеджер</th>
+                    <th>Контрагент</th>
+                    <th>Объект расчетов</th>
+                    <th>Дата погашения</th>
+                    <th>Дней долга</th>
+                    <th>Просроченная сумма</th>
+                </tr></thead><tbody>`;
+
+                Object.keys(grouped).forEach(mgr => {
+                    // Строка-заголовок менеджера
+                    const totalSum = grouped[mgr].reduce((s, item) => s + item.overdueSum, 0);
+                    const totalDays = grouped[mgr].reduce((s, item) => s + item.days, 0);
+                    html += `<tr class="manager-group">
+                        <td colspan="5"><strong>${mgr}</strong> (${grouped[mgr].length} записей)</td>
+                        <td class="num"><strong>${formatCurrency(totalSum)}</strong></td>
+                    </tr>`;
+
+                    // Детали
+                    grouped[mgr].forEach(item => {
+                        html += `<tr>
+                            <td></td>
+                            <td>${item.contractor}</td>
+                            <td>${item.object}</td>
+                            <td>${item.date}</td>
+                            <td class="num">${item.days}</td>
+                            <td class="num">${formatCurrency(item.overdueSum)}</td>
+                        </tr>`;
+                    });
+                });
+
+                html += `</tbody></table>`;
+                debtTableWrap.innerHTML = html;
+            }
+
+            // ---------- УТРАЧЕННЫЕ КЛИЕНТЫ ----------
+            function renderLostClients(salesData) {
+                const wrap = $('lostClientsWrap');
+                const lostMonths = parseInt(lostPeriodFilter.value) || 3;
+                const lostManager = lostManagerFilter.value;
+
+                if (!salesData || salesData.length === 0) {
+                    wrap.innerHTML = `<div class="empty-state"><div class="icon">📂</div><h3>Нет данных</h3></div>`;
+                    $('lostClientsCount').textContent = '0';
+                    return;
+                }
+
+                let lastDate = null;
+                salesData.forEach(item => {
+                    Object.keys(item.months).forEach(key => {
+                        const d = getDateFromKey(key);
+                        if (d && (!lastDate || d > lastDate)) lastDate = d;
+                    });
+                });
+
+                if (!lastDate) {
+                    wrap.innerHTML = `<div class="empty-state"><div class="icon">📂</div><h3>Нет данных</h3></div>`;
+                    $('lostClientsCount').textContent = '0';
+                    return;
+                }
+
+                const clientData = {};
+                salesData.forEach(item => {
+                    if (lostManager !== 'all' && item.manager !== lostManager) return;
+                    const mgr = item.manager;
+                    const client = item.client;
+                    const key = `${mgr}|${client}`;
+                    if (!clientData[key]) {
+                        clientData[key] = { manager: mgr, client: client, lastDate: null, lastAmount: 0, totalYear: 0 };
+                    }
+                    Object.keys(item.months).forEach(monthKey => {
+                        const val = item.months[monthKey] || 0;
+                        const d = getDateFromKey(monthKey);
+                        if (d) {
+                            if (!clientData[key].lastDate || d > clientData[key].lastDate) {
+                                clientData[key].lastDate = d;
+                                clientData[key].lastAmount = val;
+                            }
+                            const yearAgo = new Date(lastDate);
+                            yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+                            if (d >= yearAgo) {
+                                clientData[key].totalYear += val;
+                            }
+                        }
+                    });
+                });
+
+                const lostClients = [];
+                const now = new Date(lastDate);
+                Object.values(clientData).forEach(item => {
+                    if (!item.lastDate) return;
+                    const monthsDiff = (now.getFullYear() - item.lastDate.getFullYear()) * 12 +
+                        (now.getMonth() - item.lastDate.getMonth());
+                    if (monthsDiff >= lostMonths) {
+                        lostClients.push({
+                            ...item,
+                            monthsDiff: monthsDiff,
+                            status: `не покупал ${monthsDiff} мес.`
+                        });
+                    }
+                });
+
+                lostClients.sort((a, b) => b.monthsDiff - a.monthsDiff);
+
+                $('lostClientsCount').textContent = lostClients.length;
+
+                if (lostClients.length === 0) {
+                    wrap.innerHTML = `<div class="empty-state"><div class="icon">✅</div><h3>Нет утраченных клиентов</h3></div>`;
+                    return;
+                }
+
+                let html = `<table><thead><tr>
+                    <th>Менеджер</th><th>Клиент</th><th>Последняя покупка</th>
+                    <th>Сумма последней</th><th>Выручка за год</th><th>Статус</th>
+                </tr></thead><tbody>`;
+
+                lostClients.forEach(item => {
+                    const dateStr = item.lastDate ? item.lastDate.toLocaleDateString('ru-RU') : '—';
+                    html += `<tr>
+                        <td><strong>${item.manager}</strong></td>
+                        <td>${item.client}</td>
+                        <td>${dateStr}</td>
+                        <td class="num">${formatCurrency(item.lastAmount)}</td>
+                        <td class="num">${formatCurrency(item.totalYear)}</td>
+                        <td><span class="status-badge lost">${item.status}</span></td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table>`;
+                wrap.innerHTML = html;
+            }
+
+            // ---------- ОБНОВЛЕНИЕ ----------
+            function refreshDashboard() {
+                const filters = {
+                    year: filterYear.value,
+                    month: filterMonth.value,
+                    managers: filterManager.value === 'all' ? ['all'] : [filterManager.value],
+                    priceType: filterPriceType.value,
+                    client: filterClient.value,
+                    lostPeriod: parseInt(lostPeriodFilter.value) || 3,
+                    lostManager: lostManagerFilter.value,
+                    debtManager: debtManagerFilter.value
+                };
+                state.filters = filters;
+
+                const filtered = filterSalesData(state.salesData, filters);
+                state.filteredSales = filtered;
+                filterCount.textContent = `Записей: ${filtered ? filtered.length : 0}`;
+
+                updateKPI(filtered, state.planData, state.debtData);
+                renderTrendChart(filtered);
+                renderClientChart(filtered);
+                renderManagersChart(filtered);
+                renderTopClients(filtered);
+                renderDebtCharts(state.debtData);
+                renderDebtTable(state.debtData);
+
+                const lostData = filterSalesData(state.salesData, {
+                    ...filters,
+                    managers: lostManagerFilter.value === 'all' ? ['all'] : [lostManagerFilter.value]
+                });
+                renderLostClients(lostData);
+
+                // Обновляем списки менеджеров
+                const managers = state.salesData ? unique(state.salesData.map(item => item.manager)).sort() : [];
+                const currentLostMgr = lostManagerFilter.value;
+                const currentDebtMgr = debtManagerFilter.value;
+                let lostOpts = '<option value="all">Все менеджеры</option>';
+                let debtOpts = '<option value="all">Все менеджеры</option>';
+                managers.forEach(m => {
+                    lostOpts += `<option value="${m}">${m}</option>`;
+                    debtOpts += `<option value="${m}">${m}</option>`;
+                });
+                lostManagerFilter.innerHTML = lostOpts;
+                lostManagerFilter.value = currentLostMgr;
+                debtManagerFilter.innerHTML = debtOpts;
+                debtManagerFilter.value = currentDebtMgr;
+            }
+
+            // ---------- НАСТРОЙКА УПРАВЛЕНИЙ ГРАФИКОВ ----------
+            function setupChartControls() {
+                document.querySelectorAll('#trendYearControls .btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        document.querySelectorAll('#trendYearControls .btn').forEach(b => b.classList.remove(
+                        'active'));
+                        this.classList.add('active');
+                        state.chartControls.trendYear = this.dataset.year;
+                        refreshDashboard();
+                    });
+                });
+
+                document.querySelectorAll('#trendPeriodControls .btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        document.querySelectorAll('#trendPeriodControls .btn').forEach(b => b.classList.remove(
+                        'active'));
+                        this.classList.add('active');
+                        state.chartControls.trendPeriod = this.dataset.period;
+                        refreshDashboard();
+                    });
+                });
+
+                document.querySelectorAll('#clientModeControls .btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        document.querySelectorAll('#clientModeControls .btn').forEach(b => b.classList.remove(
+                        'active'));
+                        this.classList.add('active');
+                        state.chartControls.clientMode = this.dataset.mode;
+                        refreshDashboard();
+                    });
+                });
+
+                document.querySelectorAll('#managersTopControls .btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        document.querySelectorAll('#managersTopControls .btn').forEach(b => b.classList.remove(
+                        'active'));
+                        this.classList.add('active');
+                        state.chartControls.managersTop = parseInt(this.dataset.top);
+                        refreshDashboard();
+                    });
+                });
+            }
+
+            // ---------- ЗАГРУЗКА ФАЙЛОВ ----------
+            function processSalesFile(file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                        const parsed = parseSalesData(json);
+                        if (!parsed) {
+                            toast('Не удалось распарсить файл продаж', 'error');
+                            return;
+                        }
+                        state.salesData = parsed;
+                        state.filters = {
+                            year: 'all',
+                            month: 'all',
+                            managers: ['all'],
+                            priceType: 'all',
+                            client: '',
+                            lostPeriod: 3,
+                            lostManager: 'all',
+                            debtManager: 'all'
+                        };
+                        populateFilters(state.salesData);
+                        refreshDashboard();
+                        salesFileName.textContent = file.name;
+                        salesRowsInfo.textContent = `(${parsed.length} строк)`;
+                        salesStatus.classList.remove('hidden');
+                        toast(`Загружено ${parsed.length} записей продаж`, 'success');
+                    } catch (err) {
+                        toast('Ошибка при чтении файла продаж: ' + err.message, 'error');
+                        console.error(err);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function processPlanFile(file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                        const parsed = parsePlanData(json);
+                        if (!parsed) {
+                            toast('Не удалось распарсить файл плана', 'error');
+                            return;
+                        }
+                        state.planData = parsed;
+                        planFileName.textContent = file.name;
+                        planRowsInfo.textContent = `(${parsed.length} записей)`;
+                        planStatus.classList.remove('hidden');
+                        toast(`Загружено ${parsed.length} плановых значений`, 'success');
+                        refreshDashboard();
+                    } catch (err) {
+                        toast('Ошибка при чтении файла плана: ' + err.message, 'error');
+                        console.error(err);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function processDebtFile(file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                        console.log('Debt JSON first rows:', json.slice(0, 3));
+                        const parsed = parseDebtData(json);
+                        if (!parsed) {
+                            toast('Не удалось распарсить файл дебиторки', 'error');
+                            return;
+                        }
+                        state.debtData = parsed;
+                        debtFileName.textContent = file.name;
+                        debtRowsInfo.textContent = `(${parsed.length} записей)`;
+                        debtStatus.classList.remove('hidden');
+                        toast(`Загружено ${parsed.length} записей дебиторки`, 'success');
+                        refreshDashboard();
+                    } catch (err) {
+                        toast('Ошибка при чтении файла дебиторки: ' + err.message, 'error');
+                        console.error(err);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            // ---------- НАСТРОЙКА ЗАГРУЗКИ ----------
+            function setupUpload(zone, input, status, processFn) {
+                zone.addEventListener('click', function(e) {
+                    if (e.target.tagName === 'INPUT') return;
+                    input.click();
+                });
+                input.addEventListener('change', function(e) {
+                    if (this.files.length > 0) processFn(this.files[0]);
+                    this.value = '';
+                });
+                zone.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.closest('.upload-card').classList.add('drag-over');
+                });
+                zone.addEventListener('dragleave', function(e) {
+                    e.preventDefault();
+                    this.closest('.upload-card').classList.remove('drag-over');
+                });
+                zone.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.closest('.upload-card').classList.remove('drag-over');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) processFn(files[0]);
+                });
+                const removeBtn = status.querySelector('.remove');
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const target = this.dataset.target;
+                        if (target === 'sales') {
+                            state.salesData = null;
+                            state.filteredSales = null;
+                            salesStatus.classList.add('hidden');
+                            salesFileName.textContent = '';
+                            salesRowsInfo.textContent = '';
+                            toast('Данные продаж сброшены', 'info');
+                        } else if (target === 'plan') {
+                            state.planData = null;
+                            planStatus.classList.add('hidden');
+                            planFileName.textContent = '';
+                            planRowsInfo.textContent = '';
+                            toast('Данные плана сброшены', 'info');
+                        } else if (target === 'debt') {
+                            state.debtData = null;
+                            debtStatus.classList.add('hidden');
+                            debtFileName.textContent = '';
+                            debtRowsInfo.textContent = '';
+                            toast('Данные дебиторки сброшены', 'info');
+                        }
+                        refreshDashboard();
+                    });
+                }
+            }
+
+            // ---------- НАСТРОЙКА ФИЛЬТРОВ ----------
+            function setupFilters() {
+                const update = () => refreshDashboard();
+                filterYear.addEventListener('change', update);
+                filterMonth.addEventListener('change', update);
+                filterManager.addEventListener('change', update);
+                filterPriceType.addEventListener('change', update);
+                filterClient.addEventListener('input', update);
+                lostPeriodFilter.addEventListener('change', update);
+                lostManagerFilter.addEventListener('change', update);
+                debtManagerFilter.addEventListener('change', update);
+            }
+
+            // ---------- СБРОС ----------
+            function resetAll() {
+                state.salesData = null;
+                state.planData = null;
+                state.debtData = null;
+                state.filteredSales = null;
+                state.filters = {
+                    year: 'all',
+                    month: 'all',
+                    managers: ['all'],
+                    priceType: 'all',
+                    client: '',
+                    lostPeriod: 3,
+                    lostManager: 'all',
+                    debtManager: 'all'
+                };
+                state.chartControls = {
+                    trendYear: 'all',
+                    trendPeriod: 'month',
+                    clientMode: 'absolute',
+                    managersTop: 3,
+                    heatmapMode: 'percent'
+                };
+                salesStatus.classList.add('hidden');
+                planStatus.classList.add('hidden');
+                debtStatus.classList.add('hidden');
+                salesFileName.textContent = '';
+                planFileName.textContent = '';
+                debtFileName.textContent = '';
+                salesRowsInfo.textContent = '';
+                planRowsInfo.textContent = '';
+                debtRowsInfo.textContent = '';
+                salesInput.value = '';
+                planInput.value = '';
+                debtInput.value = '';
+                filterClient.value = '';
+                [filterYear, filterMonth, filterPriceType].forEach(sel => {
+                    sel.innerHTML = '<option value="all">Все</option>';
+                });
+                filterManager.innerHTML = '<option value="all">Все</option>';
+                lostManagerFilter.innerHTML = '<option value="all">Все менеджеры</option>';
+                debtManagerFilter.innerHTML = '<option value="all">Все менеджеры</option>';
+                lostPeriodFilter.value = '3';
+
+                document.querySelectorAll('#trendYearControls .btn').forEach((b, i) => {
+                    b.classList.toggle('active', i === 0);
+                });
+                document.querySelectorAll('#trendPeriodControls .btn').forEach((b, i) => {
+                    b.classList.toggle('active', i === 0);
+                });
+                document.querySelectorAll('#clientModeControls .btn').forEach((b, i) => {
+                    b.classList.toggle('active', i === 0);
+                });
+                document.querySelectorAll('#managersTopControls .btn').forEach((b, i) => {
+                    b.classList.toggle('active', i === 0);
+                });
+
+                toast('Все данные сброшены', 'info');
+                refreshDashboard();
+            }
+
+            // ---------- ИНИЦИАЛИЗАЦИЯ ----------
+            function init() {
+                setupUpload(salesZone, salesInput, salesStatus, processSalesFile);
+                setupUpload(planZone, planInput, planStatus, processPlanFile);
+                setupUpload(debtZone, debtInput, debtStatus, processDebtFile);
+                setupFilters();
+                setupChartControls();
+                resetBtn.addEventListener('click', resetAll);
+                refreshDashboard();
+            }
+
+            init();
+
+        })();
+    </script>
+
+</body>
+</html>
